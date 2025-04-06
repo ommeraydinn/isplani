@@ -268,7 +268,7 @@ def login():
                 return redirect(url_for('login'))
             
             login_user(user)
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('index'))
         else:
             flash('Geçersiz e-posta adresi veya şifre!')
             
