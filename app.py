@@ -256,29 +256,22 @@ def load_user(user_id):
 # Giriş sayfası
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('index'))
-        
     if request.method == 'POST':
-        username = request.form.get('username')
+        email = request.form.get('email')
         password = request.form.get('password')
-        user = User.query.filter_by(username=username).first()
         
-        if not user:
-            flash('Kullanıcı bulunamadı.', 'danger')
-            return redirect(url_for('login'))
-            
-        if not user.is_active and not user.is_admin:  # Admin için kontrol yapma
-            flash('Hesabınız henüz aktifleştirilmemiş. Lütfen e-posta adresinizi kontrol edin.', 'warning')
-            return redirect(url_for('login'))
-            
+        user = User.query.filter_by(email=email).first()
+        
         if user and user.check_password(password):
+            if not user.is_active:
+                flash('Hesabınız henüz aktif değil. Lütfen e-posta adresinize gönderilen aktivasyon linkine tıklayın.')
+                return redirect(url_for('login'))
+            
             login_user(user)
-            flash('Başarıyla giriş yaptınız.', 'success')
-            return redirect(url_for('index'))
+            return redirect(url_for('dashboard'))
         else:
-            flash('Geçersiz kullanıcı adı veya şifre', 'danger')
-    
+            flash('Geçersiz e-posta adresi veya şifre!')
+            
     return render_template('login.html')
 
 # Kayıt sayfası
