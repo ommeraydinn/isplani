@@ -1211,7 +1211,7 @@ def invite_user():
             first_name=first_name,
             last_name=last_name,
             is_active=False,
-            invitation_token=token,
+            activation_token=token,
             invitation_sent_at=datetime.utcnow()
         )
         
@@ -1236,49 +1236,17 @@ def invite_user():
 
     return render_template('invite_user.html')
 
-@app.route('/activate_account/<token>', methods=['GET', 'POST'])
+@app.route('/activate_account/<token>')
 def activate_account(token):
-    """Kullanıcı hesabı aktivasyonu"""
-    user = User.query.filter_by(invitation_token=token).first()
-    
-    if not user:
-        flash('Geçersiz aktivasyon linki.', 'danger')
-        return redirect(url_for('login'))
-    
-    if user.is_active:
-        flash('Bu hesap zaten aktif.', 'warning')
-        return redirect(url_for('login'))
-    
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        password_confirm = request.form.get('password_confirm')
-        
-        # Kullanıcı adı kontrolü
-        if User.query.filter_by(username=username).first():
-            flash('Bu kullanıcı adı zaten kullanılıyor.', 'danger')
-            return redirect(url_for('activate_account', token=token))
-        
-        if password != password_confirm:
-            flash('Şifreler eşleşmiyor.', 'danger')
-            return redirect(url_for('activate_account', token=token))
-        
-        # Hesabı aktifleştir
-        user.username = username
-        user.password_hash = generate_password_hash(password)
+    user = User.query.filter_by(activation_token=token).first()
+    if user:
         user.is_active = True
-        user.invitation_token = None  # Token'ı temizle
-        
-        try:
-            db.session.commit()
-            flash('Hesabınız başarıyla aktifleştirildi. Şimdi giriş yapabilirsiniz.', 'success')
-            return redirect(url_for('login'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Hesap aktifleştirilirken bir hata oluştu: {str(e)}', 'danger')
-            return redirect(url_for('activate_account', token=token))
-    
-    return render_template('activate_account.html')
+        user.activation_token = None
+        db.session.commit()
+        flash('Hesabınız başarıyla aktifleştirildi! Şimdi giriş yapabilirsiniz.')
+    else:
+        flash('Geçersiz veya kullanılmış aktivasyon linki!')
+    return redirect(url_for('login'))
 
 @app.route('/users')
 @login_required
