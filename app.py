@@ -1277,20 +1277,29 @@ def users():
 def send_invitation_email(user_email, activation_link, first_name, last_name):
     """Kullanıcıya davet e-postası gönder"""
     try:
-        msg = Message(
-            'İş Akışı Yönetimi - Hesap Aktivasyonu',
-            recipients=[user_email]
-        )
-        msg.html = render_template(
-            'email/invitation.html',
-            activation_link=activation_link,
-            first_name=first_name,
-            last_name=last_name
-        )
+        msg = Message('İş Planı - Hesap Aktivasyonu',
+                      sender=app.config['MAIL_USERNAME'],
+                      recipients=[user_email])
+        
+        msg.body = f'''Merhaba {first_name} {last_name},
+
+İş Planı uygulamasına hoş geldiniz. Hesabınızı aktifleştirmek için aşağıdaki linke tıklayın:
+
+{activation_link}
+
+Bu link 24 saat içinde geçerliliğini yitirecektir.
+
+İyi çalışmalar,
+İş Planı Ekibi'''
+
+        print(f"Mail gönderiliyor: {user_email}")
         mail.send(msg)
+        print(f"Mail başarıyla gönderildi: {user_email}")
         return True
     except Exception as e:
-        print(f"E-posta gönderirken hata oluştu: {str(e)}")
+        print(f"Mail gönderme hatası: {str(e)}")
+        import traceback
+        print(f"Hata detayı:\n{traceback.format_exc()}")
         return False
 
 # Veritabanını oluştur
