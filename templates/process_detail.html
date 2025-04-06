@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>{{ process.name }}</h2>
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Geri
+                </a>
+            </div>
+            <p class="text-muted">{{ process.description }}</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Sıra No</th>
+                            <th>İş Adımı</th>
+                            <th>Açıklama</th>
+                            <th>Süre (Gün)</th>
+                            <th>Sorumlu</th>
+                            <th>Referans</th>
+                            <th>Termin Tarihi</th>
+                            <th>Durum</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for step in process.work_steps %}
+                        <tr>
+                            <td>{{ step.sequence_number }}</td>
+                            <td>{{ step.name }}</td>
+                            <td>{{ step.description }}</td>
+                            <td>{{ step.duration }}</td>
+                            <td>
+                                {% if step.assigned_user %}
+                                    <span class="badge bg-info">{{ step.assigned_user.username }}</span>
+                                {% elif step.assigned_team %}
+                                    <span class="badge bg-primary">{{ step.assigned_team }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Atanmamış</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if step.is_reference %}
+                                    <span class="badge bg-success">Referans İş Adımı</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if step.is_reference and step.reference_end_date %}
+                                    {{ step.reference_end_date.strftime('%d.%m.%Y %H:%M') }}
+                                {% elif process.reference_step and process.reference_step.reference_end_date %}
+                                    {% set ref_date = process.reference_step.reference_end_date %}
+                                    {% if step.sequence_number < process.reference_step.sequence_number %}
+                                        {{ (ref_date - timedelta(days=process.get_total_duration_before_reference(step))).strftime('%d.%m.%Y %H:%M') }}
+                                    {% else %}
+                                        {{ (ref_date + timedelta(days=process.get_total_duration_after_reference(step))).strftime('%d.%m.%Y %H:%M') }}
+                                    {% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if step.status == 'completed' %}
+                                    <span class="badge bg-success">Tamamlandı</span>
+                                {% else %}
+                                    <span class="badge bg-warning">Devam Ediyor</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

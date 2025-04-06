@@ -1,0 +1,558 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .work-step {
+        position: relative;
+    }
+    .handle {
+        cursor: move;
+        color: #6c757d;
+        margin-right: 8px;
+        padding: 8px;
+        border-radius: 4px;
+    }
+    .handle:hover {
+        background-color: #e9ecef;
+    }
+    .work-step.dragging {
+        opacity: 0.5;
+        border: 2px dashed #007bff;
+    }
+    .work-step.drag-over {
+        border-top: 3px solid #28a745;
+    }
+    .calculated-date {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 10px;
+    }
+</style>
+<div class="container mt-4">
+    <h2>{% if edit_mode %}Süreç Düzenle{% else %}Yeni Süreç Oluştur{% endif %}</h2>
+    <form method="POST" id="processForm">
+        <div class="mb-3">
+            <label for="name" class="form-label">Süreç Adı</label>
+            <input type="text" class="form-control" id="name" name="name" required 
+                   value="{{ process.name if edit_mode else '' }}">
+        </div>
+        <div class="mb-3">
+            <label for="description" class="form-label">Açıklama</label>
+            <textarea class="form-control" id="description" name="description" rows="3">{{ process.description if edit_mode else '' }}</textarea>
+        </div>
+
+        <div id="workStepsContainer">
+            <h3>İş Adımları</h3>
+            <div class="work-steps-list" id="workStepsList">
+                {% if edit_mode and process.work_steps %}
+                    {% for step in process.work_steps|sort(attribute='sequence_number') %}
+                    <div class="work-step mb-3 card" draggable="false" data-step-id="{{ loop.index0 }}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="card-title">
+                                    <i class="bi bi-grip-vertical handle" draggable="true"></i>
+                                    İş Adımı #<span class="step-number">{{ loop.index }}</span>
+                                </h5>
+                                <button type="button" class="btn btn-danger btn-sm remove-step"><i class="bi bi-trash"></i></button>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-2">
+                                        <label class="form-label">İş Adımı Adı</label>
+                                        <input type="text" class="form-control" name="work_steps[{{ loop.index0 }}][name]" required value="{{ step.name }}">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-2">
+                                        <label class="form-label">Süre (Gün)</label>
+                                        <input type="number" class="form-control duration-input" name="work_steps[{{ loop.index0 }}][duration]" required value="{{ step.duration }}">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input reference-check" type="checkbox" 
+                                                   name="work_steps[{{ loop.index0 }}][is_reference]" 
+                                                   {% if step.is_reference %}checked{% endif %}>
+                                            <label class="form-check-label">Referans İş Adımı</label>
+                                        </div>
+                                    </div>
+                                    <div class="reference-date mb-2" {% if not step.is_reference %}style="display: none;"{% endif %}>
+                                        <label class="form-label">Referans Bitiş Tarihi</label>
+                                        <input type="datetime-local" class="form-control reference-date-input" 
+                                               name="work_steps[{{ loop.index0 }}][reference_end_date]"
+                                               value="{{ step.reference_end_date.strftime('%Y-%m-%dT%H:%M') if step.reference_end_date else '' }}">
+                                    </div>
+                                    {% if step.is_reference and step.reference_end_date %}
+                                    <div class="calculated-date mt-2">
+                                        <strong>Hesaplanan Tarih:</strong> <span>{{ step.reference_end_date.strftime('%d.%m.%Y %H:%M') }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="mb-2">
+                                        <label class="form-label">Atama Tipi</label>
+                                        <div class="form-check">
+                                            <input class="form-check-input assignment-type" type="radio" 
+                                                   name="work_steps[{{ loop.index0 }}][assignment_type]" value="team"
+                                                   {% if step.assigned_team %}checked{% endif %}>
+                                            <label class="form-check-label">Ekip</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input assignment-type" type="radio" 
+                                                   name="work_steps[{{ loop.index0 }}][assignment_type]" value="user"
+                                                   {% if step.assigned_user_id %}checked{% endif %}>
+                                            <label class="form-check-label">Kullanıcı</label>
+                                        </div>
+                                    </div>
+                                    <div class="team-select" {% if not step.assigned_team %}style="display: none;"{% endif %}>
+                                        <label class="form-label">Ekip Seç</label>
+                                        <select class="form-control" id="team" name="team" required>
+                                            <option value="">Seçiniz</option>
+                                            {% for team in teams %}
+                                                {% if team.is_parent %}
+                                                <option value="{{ team.id }}" style="font-weight: bold">{{ team.name }}</option>
+                                                {% else %}
+                                                <option value="{{ team.id }}" style="padding-left: 20px">{{ team.name }}</option>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="user-select" {% if not step.assigned_user_id %}style="display: none;"{% endif %}>
+                                        <label class="form-label">Kullanıcı Seç</label>
+                                        <select class="form-select" name="work_steps[{{ loop.index0 }}][assigned_user]">
+                                            <option value="">Seçiniz...</option>
+                                            {% for user in users %}
+                                            <option value="{{ user.id }}" {% if step.assigned_user_id == user.id %}selected{% endif %}>
+                                                {{ user.username }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+
+        <button type="button" class="btn btn-secondary mb-3" id="addWorkStep">
+            <i class="bi bi-plus"></i> İş Adımı Ekle
+        </button>
+
+        <div class="mb-3">
+            {% if is_template %}
+                <button type="submit" class="btn btn-primary" name="action" value="create">
+                    <i class="bi bi-plus-circle"></i> Süreç Oluştur
+                </button>
+                <button type="submit" class="btn btn-warning" name="action" value="update">
+                    <i class="bi bi-save"></i> Taslağı Güncelle
+                </button>
+            {% else %}
+                <button type="submit" class="btn btn-primary" name="action" value="create">
+                {% if edit_mode %}Güncelle{% else %}Oluştur{% endif %}
+            </button>
+            <button type="submit" class="btn btn-info" name="action" value="save_template">
+                    <i class="bi bi-bookmark-plus"></i> Taslak Olarak Kaydet
+            </button>
+            {% endif %}
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">İptal</a>
+        </div>
+    </form>
+</div>
+
+<template id="workStepTemplate">
+    <div class="work-step mb-3 card" draggable="false">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="card-title">
+                    <i class="bi bi-grip-vertical handle" draggable="true"></i>
+                    İş Adımı #<span class="step-number"></span>
+                </h5>
+                <button type="button" class="btn btn-danger btn-sm remove-step"><i class="bi bi-trash"></i></button>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-2">
+                        <label class="form-label">İş Adımı Adı</label>
+                        <input type="text" class="form-control" name="work_steps[INDEX][name]" required>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-2">
+                        <label class="form-label">Süre (Gün)</label>
+                        <input type="number" class="form-control duration-input" name="work_steps[INDEX][duration]" required>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-12">
+                    <div class="mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input reference-check" type="checkbox" name="work_steps[INDEX][is_reference]">
+                            <label class="form-check-label">Referans İş Adımı</label>
+                        </div>
+                    </div>
+                    <div class="reference-date mb-2" style="display: none;">
+                        <label class="form-label">Referans Bitiş Tarihi</label>
+                        <input type="datetime-local" class="form-control reference-date-input" name="work_steps[INDEX][reference_end_date]">
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-12">
+                    <div class="mb-2">
+                        <label class="form-label">Atama Tipi</label>
+                        <div class="form-check">
+                            <input class="form-check-input assignment-type" type="radio" 
+                                   name="work_steps[INDEX][assignment_type]" value="team">
+                            <label class="form-check-label">Ekip</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input assignment-type" type="radio" 
+                                   name="work_steps[INDEX][assignment_type]" value="user">
+                            <label class="form-check-label">Kullanıcı</label>
+                        </div>
+                    </div>
+                    <div class="team-select" style="display: none;">
+                        <label class="form-label">Ekip Seç</label>
+                        <select class="form-control" id="team" name="team" required>
+                            <option value="">Seçiniz</option>
+                            {% for team in teams %}
+                                {% if team.is_parent %}
+                                <option value="{{ team.id }}" style="font-weight: bold">{{ team.name }}</option>
+                                {% else %}
+                                <option value="{{ team.id }}" style="padding-left: 20px">{{ team.name }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="user-select" style="display: none;">
+                        <label class="form-label">Kullanıcı Seç</label>
+                        <select class="form-select" name="work_steps[INDEX][assigned_user]">
+                            <option value="">Seçiniz...</option>
+                            {% for user in users %}
+                            <option value="{{ user.id }}">{{ user.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+{% endblock content %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const workStepsContainer = document.getElementById('workStepsContainer');
+    const workStepsList = document.getElementById('workStepsList');
+    const addWorkStepBtn = document.getElementById('addWorkStep');
+    const workStepTemplate = document.getElementById('workStepTemplate');
+    const processForm = document.getElementById('processForm');
+
+    let stepCounter = document.querySelectorAll('.work-step').length;
+
+    function updateStepNumbers() {
+        document.querySelectorAll('.work-step').forEach((step, index) => {
+            step.querySelector('.step-number').textContent = index + 1;
+            
+            // İnput ve select elemanlarının name özelliklerini güncelle
+            const inputs = step.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                const name = input.getAttribute('name');
+                if (name) {
+                    input.setAttribute('name', name.replace(/\[(\d+|INDEX)\]/, `[${index}]`));
+                }
+            });
+        });
+    }
+
+    function addBusinessDays(date, days) {
+        let result = new Date(date);
+        let addedDays = 0;
+        
+        while (addedDays < days) {
+            result.setDate(result.getDate() + 1);
+            if (isBusinessDay(result)) {
+                addedDays++;
+            }
+        }
+        
+        while (!isBusinessDay(result)) {
+            result.setDate(result.getDate() + 1);
+        }
+        
+        return result;
+    }
+
+    function subtractBusinessDays(date, days) {
+        let result = new Date(date);
+        let subtractedDays = 0;
+        
+        while (subtractedDays < days) {
+            result.setDate(result.getDate() - 1);
+            if (isBusinessDay(result)) {
+                subtractedDays++;
+            }
+        }
+        
+        while (!isBusinessDay(result)) {
+            result.setDate(result.getDate() - 1);
+        }
+        
+        return result;
+    }
+
+    function isBusinessDay(date) {
+        const day = date.getDay();
+        if (day === 0 || day === 6) { // Hafta sonu kontrolü
+            return false;
+        }
+
+        const dateString = date.toISOString().split('T')[0];
+        
+        const fixedHolidays = [
+            `${date.getFullYear()}-01-01`, // Yılbaşı
+            `${date.getFullYear()}-04-23`, // 23 Nisan
+            `${date.getFullYear()}-05-01`, // İşçi Bayramı
+            `${date.getFullYear()}-05-19`, // 19 Mayıs
+            `${date.getFullYear()}-07-15`, // 15 Temmuz
+            `${date.getFullYear()}-08-30`, // 30 Ağustos
+            `${date.getFullYear()}-10-29`  // 29 Ekim
+        ];
+
+        const religiousHolidays2024 = [
+            "2024-04-10", "2024-04-11", "2024-04-12", // Ramazan Bayramı
+            "2024-06-16", "2024-06-17", "2024-06-18", "2024-06-19" // Kurban Bayramı
+        ];
+
+        const religiousHolidays2025 = [
+            "2025-03-31", "2025-04-01", "2025-04-02", // Ramazan Bayramı
+            "2025-06-06", "2025-06-07", "2025-06-08", "2025-06-09" // Kurban Bayramı
+        ];
+
+        const allHolidays = [
+            ...fixedHolidays,
+            ...religiousHolidays2024,
+            ...religiousHolidays2025
+        ];
+
+        return !allHolidays.includes(dateString);
+    }
+
+    function formatDate(date) {
+        return date.toLocaleString('tr-TR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            weekday: 'long'
+        });
+    }
+
+    function updateCalculatedDates() {
+        const steps = document.querySelectorAll('.work-step');
+        let referenceStep = null;
+        let referenceDate = null;
+
+        // Referans adımını bul
+        steps.forEach(step => {
+            const referenceCheck = step.querySelector('.reference-check');
+            if (referenceCheck && referenceCheck.checked) {
+                referenceStep = step;
+                const dateInput = step.querySelector('.reference-date-input');
+                if (dateInput && dateInput.value) {
+                    referenceDate = new Date(dateInput.value);
+                }
+            }
+        });
+
+        if (!referenceDate) {
+            steps.forEach(step => {
+                let calculatedDate = step.querySelector('.calculated-date');
+                if (calculatedDate) {
+                    calculatedDate.style.display = 'none';
+                }
+            });
+            return;
+        }
+
+        const referenceIndex = Array.from(steps).indexOf(referenceStep);
+
+        steps.forEach((step, index) => {
+            const durationInput = step.querySelector('.duration-input');
+            const duration = parseInt(durationInput.value) || 0;
+
+            let calculatedDate = step.querySelector('.calculated-date');
+            if (!calculatedDate) {
+                calculatedDate = document.createElement('div');
+                calculatedDate.className = 'calculated-date mt-2';
+                step.querySelector('.card-body').appendChild(calculatedDate);
+            }
+
+            let targetDate;
+            if (index < referenceIndex) {
+                targetDate = subtractBusinessDays(referenceDate, duration);
+            } else if (index > referenceIndex) {
+                targetDate = addBusinessDays(referenceDate, duration);
+            } else {
+                targetDate = referenceDate;
+            }
+
+            calculatedDate.innerHTML = `<strong>Hesaplanan Tarih:</strong> ${formatDate(targetDate)}`;
+            calculatedDate.style.display = 'block';
+        });
+    }
+
+    // Event Listeners
+    addWorkStepBtn.addEventListener('click', function() {
+        const template = workStepTemplate.content.cloneNode(true);
+        const newStep = template.querySelector('.work-step');
+        
+        // Yeni adımın input ve select elemanlarının name özelliklerini güncelle
+        const inputs = newStep.querySelectorAll('input, select');
+        inputs.forEach(input => {
+            const name = input.getAttribute('name');
+            if (name) {
+                input.setAttribute('name', name.replace('INDEX', stepCounter));
+            }
+        });
+
+        workStepsList.appendChild(newStep);
+        stepCounter++;
+        updateStepNumbers();
+    });
+
+    // Sürükle-bırak işlemleri
+    workStepsList.addEventListener('dragstart', function(e) {
+        if (e.target.classList.contains('handle')) {
+            const workStep = e.target.closest('.work-step');
+            workStep.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', '');
+        }
+    });
+
+    workStepsList.addEventListener('dragend', function(e) {
+        if (e.target.classList.contains('handle')) {
+            const workStep = e.target.closest('.work-step');
+            workStep.classList.remove('dragging');
+            updateStepNumbers();
+            updateCalculatedDates();
+        }
+    });
+
+    workStepsList.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        const draggingStep = workStepsList.querySelector('.dragging');
+        if (!draggingStep) return;
+
+        const siblings = [...workStepsList.querySelectorAll('.work-step:not(.dragging)')];
+        const nextSibling = siblings.find(sibling => {
+            const box = sibling.getBoundingClientRect();
+            const offset = e.clientY - box.top - box.height / 2;
+            return offset < 0;
+        });
+
+        if (nextSibling) {
+            workStepsList.insertBefore(draggingStep, nextSibling);
+        } else {
+            workStepsList.appendChild(draggingStep);
+        }
+    });
+        
+    // Referans tarihi ve süre değişikliklerini izle
+    workStepsList.addEventListener('change', function(e) {
+        if (e.target.classList.contains('reference-check')) {
+            // Diğer referans checkboxlarını kaldır
+            document.querySelectorAll('.reference-check').forEach(checkbox => {
+                if (checkbox !== e.target) {
+                    checkbox.checked = false;
+                    checkbox.closest('.work-step').querySelector('.reference-date').style.display = 'none';
+                }
+            });
+
+            const workStep = e.target.closest('.work-step');
+            const referenceDate = workStep.querySelector('.reference-date');
+            referenceDate.style.display = e.target.checked ? 'block' : 'none';
+            
+            if (!e.target.checked) {
+                const dateInput = referenceDate.querySelector('input[type="datetime-local"]');
+                dateInput.value = '';
+            }
+            
+            updateCalculatedDates();
+        } else if (e.target.classList.contains('reference-date-input') || 
+                   e.target.classList.contains('duration-input')) {
+            updateCalculatedDates();
+        } else if (e.target.classList.contains('assignment-type')) {
+            const workStep = e.target.closest('.work-step');
+            const teamSelect = workStep.querySelector('.team-select');
+            const userSelect = workStep.querySelector('.user-select');
+            
+            if (e.target.value === 'team') {
+                teamSelect.style.display = 'block';
+                userSelect.style.display = 'none';
+                userSelect.querySelector('select').value = '';
+            } else if (e.target.value === 'user') {
+                teamSelect.style.display = 'none';
+                userSelect.style.display = 'block';
+                teamSelect.querySelector('select').value = '';
+            }
+        }
+    });
+
+    // İş adımı silme
+    workStepsList.addEventListener('click', function(e) {
+        if (e.target.closest('.remove-step')) {
+            const workStep = e.target.closest('.work-step');
+            workStep.remove();
+            updateStepNumbers();
+            updateCalculatedDates();
+        }
+    });
+
+    // Form gönderimi öncesi kontrol
+    processForm.addEventListener('submit', function(e) {
+        // En az bir iş adımı var mı kontrol et
+        if (document.querySelectorAll('.work-step').length === 0) {
+            e.preventDefault();
+            alert('En az bir iş adımı eklemelisiniz.');
+            return;
+        }
+
+        // Tüm zorunlu alanların doldurulduğunu kontrol et
+        const requiredFields = this.querySelectorAll('[required]');
+        let isValid = true;
+
+        requiredFields.forEach(field => {
+            if (!field.value) {
+                field.classList.add('is-invalid');
+                isValid = false;
+            } else {
+                field.classList.remove('is-invalid');
+            }
+        });
+
+        if (!isValid) {
+            e.preventDefault();
+            alert('Lütfen tüm zorunlu alanları doldurun.');
+            return;
+        }
+    });
+
+    // Sayfa yüklendiğinde tarihleri hesapla
+    updateCalculatedDates();
+});
+</script>
+{% endblock scripts %}

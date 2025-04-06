@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Yeni Süreç Taslağı Oluştur</h2>
+    <form method="POST" id="templateForm">
+        <div class="mb-3">
+            <label for="name" class="form-label">Taslak Adı</label>
+            <input type="text" class="form-control" id="name" name="name" required>
+        </div>
+        <div class="mb-3">
+            <label for="description" class="form-label">Açıklama</label>
+            <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+        </div>
+
+        <div id="workStepsContainer">
+            <h3>İş Adımları</h3>
+            <div class="work-steps-list" id="workStepsList">
+            </div>
+        </div>
+
+        <button type="button" class="btn btn-secondary mb-3" id="addWorkStep">
+            <i class="bi bi-plus"></i> İş Adımı Ekle
+        </button>
+
+        <div class="mb-3">
+            <button type="submit" class="btn btn-primary">Taslak Oluştur</button>
+            <a href="{{ url_for('process_templates') }}" class="btn btn-secondary">İptal</a>
+        </div>
+    </form>
+</div>
+
+<template id="workStepTemplate">
+    <div class="work-step mb-3 card" draggable="false">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="card-title">
+                    <i class="bi bi-grip-vertical handle" draggable="true"></i>
+                    İş Adımı #<span class="step-number"></span>
+                </h5>
+                <button type="button" class="btn btn-danger btn-sm remove-step"><i class="bi bi-trash"></i></button>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-2">
+                        <label class="form-label">İş Adımı Adı</label>
+                        <input type="text" class="form-control" name="work_steps[INDEX][name]" required>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-2">
+                        <label class="form-label">Süre (Gün)</label>
+                        <input type="number" class="form-control" name="work_steps[INDEX][duration]" required>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-12">
+                    <div class="mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input reference-check" type="checkbox" name="work_steps[INDEX][is_reference]">
+                            <label class="form-check-label">Referans İş Adımı</label>
+                        </div>
+                    </div>
+                    <div class="reference-date mb-2" style="display: none;">
+                        <label class="form-label">Referans Bitiş Tarihi</label>
+                        <input type="datetime-local" class="form-control" name="work_steps[INDEX][reference_end_date]">
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-12">
+                    <div class="mb-2">
+                        <label class="form-label">Atama Tipi</label>
+                        <div class="form-check">
+                            <input class="form-check-input assignment-type" type="radio" 
+                                   name="work_steps[INDEX][assignment_type]" value="team">
+                            <label class="form-check-label">Ekip</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input assignment-type" type="radio" 
+                                   name="work_steps[INDEX][assignment_type]" value="user">
+                            <label class="form-check-label">Kullanıcı</label>
+                        </div>
+                    </div>
+                    <div class="team-select" style="display: none;">
+                        <label class="form-label">Ekip Seç</label>
+                        <select class="form-select" name="work_steps[INDEX][assigned_team]">
+                            <option value="">Seçiniz...</option>
+                            <option value="Tasarım">Tasarım</option>
+                            <option value="Satış">Satış</option>
+                            <option value="Lojistik">Lojistik</option>
+                            <option value="Üretim">Üretim</option>
+                            <option value="Kalite">Kalite</option>
+                        </select>
+                    </div>
+                    <div class="user-select" style="display: none;">
+                        <label class="form-label">Kullanıcı Seç</label>
+                        <select class="form-select" name="work_steps[INDEX][assigned_user]">
+                            <option value="">Seçiniz...</option>
+                            {% for user in users %}
+                            <option value="{{ user.id }}">{{ user.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<style>
+    .work-step {
+        position: relative;
+    }
+    .handle {
+        cursor: move;
+        color: #6c757d;
+        margin-right: 8px;
+        padding: 8px;
+        border-radius: 4px;
+    }
+    .handle:hover {
+        background-color: #e9ecef;
+    }
+    .work-step.dragging {
+        opacity: 0.5;
+        border: 2px dashed #007bff;
+    }
+    .work-step.drag-over {
+        border-top: 3px solid #28a745;
+    }
+</style>
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const workStepsContainer = document.getElementById('workStepsContainer');
+    const workStepsList = document.getElementById('workStepsList');
+    const addWorkStepBtn = document.getElementById('addWorkStep');
+    const workStepTemplate = document.getElementById('workStepTemplate');
+    const templateForm = document.getElementById('templateForm');
+
+    // Sürükle-bırak olaylarını ekle
+    function addDragEvents(workStep) {
+        const handle = workStep.querySelector('.handle');
+        handle.addEventListener('dragstart', handleDragStart);
+        handle.addEventListener('dragend', handleDragEnd);
+        workStep.addEventListener('dragover', handleDragOver);
+        workStep.addEventListener('drop', handleDrop);
+    }
+
+    function handleDragStart(e) {
+        draggedItem = this.closest('.work-step');
+        draggedItem.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleDragEnd(e) {
+        if (draggedItem) {
+            draggedItem.classList.remove('dragging');
+            draggedItem = null;
+        }
+        document.querySelectorAll('.work-step').forEach(item => {
+            item.classList.remove('drag-over');
+        });
+    }
+
+    function handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        this.classList.add('drag-over');
+        draggedOverItem = this;
+    }
+
+    function handleDrop(e) {
+        e.preventDefault();
+        this.classList.remove('drag-over');
+        
+        if (draggedItem !== draggedOverItem) {
+            const allItems = [...workStepsList.querySelectorAll('.work-step')];
+            const draggedIndex = allItems.indexOf(draggedItem);
+            const droppedIndex = allItems.indexOf(draggedOverItem);
+
+            if (draggedIndex > droppedIndex) {
+                draggedOverItem.parentNode.insertBefore(draggedItem, draggedOverItem);
+            } else {
+                draggedOverItem.parentNode.insertBefore(draggedItem, draggedOverItem.nextSibling);
+            }
+
+            updateStepNumbers();
+        }
+    }
+
+    function updateStepNumbers() {
+        document.querySelectorAll('.work-step').forEach((step, index) => {
+            step.querySelector('.step-number').textContent = index + 1;
+            
+            // Form alanlarının name özelliklerini güncelle
+            step.querySelectorAll('input, select').forEach(element => {
+                if (element.name) {
+                    element.name = element.name.replace(/work_steps\[\d+\]/, `work_steps[${index}]`);
+                }
+            });
+        });
+    }
+
+    function setupEventListeners(workStep) {
+        // Referans iş adımı kontrolü
+        const referenceCheck = workStep.querySelector('.reference-check');
+        const referenceDate = workStep.querySelector('.reference-date');
+        
+        referenceCheck.addEventListener('change', function() {
+            referenceDate.style.display = this.checked ? 'block' : 'none';
+        });
+
+        // Atama tipi kontrolü
+        const assignmentRadios = workStep.querySelectorAll('.assignment-type');
+        const teamSelect = workStep.querySelector('.team-select');
+        const userSelect = workStep.querySelector('.user-select');
+        
+        assignmentRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.value === 'team') {
+                    teamSelect.style.display = 'block';
+                    userSelect.style.display = 'none';
+                } else {
+                    teamSelect.style.display = 'none';
+                    userSelect.style.display = 'block';
+                }
+            });
+        });
+
+        // Silme butonu
+        const removeBtn = workStep.querySelector('.remove-step');
+        removeBtn.addEventListener('click', function() {
+            workStep.remove();
+            updateStepNumbers();
+        });
+    }
+
+    // Yeni iş adımı ekle
+    addWorkStepBtn.addEventListener('click', function() {
+        const newStep = workStepTemplate.content.cloneNode(true).querySelector('.work-step');
+        addDragEvents(newStep);
+        workStepsList.appendChild(newStep);
+        updateStepNumbers();
+        setupEventListeners(newStep);
+    });
+});
+</script>
+{% endblock %}
+{% endblock %} 

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <h2>İş Adımını Düzenle</h2>
+        <form method="POST" class="mt-4">
+            <div class="mb-3">
+                <label for="name" class="form-label">İş Adımı Adı</label>
+                <input type="text" class="form-control" id="name" name="name" value="{{ work_step.name }}" required>
+            </div>
+            
+            <div class="mb-3">
+                <label for="description" class="form-label">Açıklama</label>
+                <textarea class="form-control" id="description" name="description" rows="3">{{ work_step.description }}</textarea>
+            </div>
+            
+            <div class="mb-3">
+                <label for="duration" class="form-label">Süre (Gün)</label>
+                <input type="number" class="form-control" id="duration" name="duration" value="{{ work_step.duration }}" required min="1">
+            </div>
+            
+            <div class="mb-3">
+                <label for="team" class="form-label">Atanan Ekip</label>
+                <select class="form-select" id="team" name="team" required>
+                    <option value="">Ekip Seçin</option>
+                    <option value="Tasarım" {% if work_step.assigned_team == 'Tasarım' %}selected{% endif %}>Tasarım</option>
+                    <option value="Üretim" {% if work_step.assigned_team == 'Üretim' %}selected{% endif %}>Üretim</option>
+                    <option value="Kalite" {% if work_step.assigned_team == 'Kalite' %}selected{% endif %}>Kalite</option>
+                    <option value="Lojistik" {% if work_step.assigned_team == 'Lojistik' %}selected{% endif %}>Lojistik</option>
+                    <option value="Satış" {% if work_step.assigned_team == 'Satış' %}selected{% endif %}>Satış</option>
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label for="status" class="form-label">Durum</label>
+                <select class="form-select" id="status" name="status" required>
+                    <option value="pending" {% if work_step.status == 'pending' %}selected{% endif %}>Beklemede</option>
+                    <option value="in_progress" {% if work_step.status == 'in_progress' %}selected{% endif %}>Devam Ediyor</option>
+                    <option value="completed" {% if work_step.status == 'completed' %}selected{% endif %}>Tamamlandı</option>
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label for="target_date" class="form-label">Hedef Tarih</label>
+                <input type="date" class="form-control" id="target_date" name="target_date" 
+                       value="{{ work_step.end_date.strftime('%Y-%m-%d') if work_step.end_date else '' }}">
+            </div>
+            
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary">Değişiklikleri Kaydet</button>
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">İptal</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %} 

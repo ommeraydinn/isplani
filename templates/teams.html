@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>Ekip Yönetimi</h2>
+                {% if current_user.is_admin %}
+                <a href="{{ url_for('add_team') }}" class="btn btn-primary">
+                    <i class="bi bi-plus"></i> Yeni Ekip
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Ekip Adı</th>
+                            <th>Ekip Türü</th>
+                            <th>Açıklama</th>
+                            <th>Üst Ekip</th>
+                            <th>Ekip Lideri</th>
+                            <th>Üye Sayısı</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for team in teams %}
+                        <tr>
+                            <td>{{ team.name }}</td>
+                            <td>{{ team.parent_type }}</td>
+                            <td>{{ team.description }}</td>
+                            <td>{{ team.parent.name if team.parent else '-' }}</td>
+                            <td>{{ team.leader.first_name }} {{ team.leader.last_name if team.leader else '-' }}</td>
+                            <td>{{ team.members.count() }}</td>
+                            <td>
+                                {% if current_user.is_admin or current_user.has_team_management_permission(team.id) %}
+                                <div class="btn-group">
+                                    <a href="{{ url_for('edit_team', team_id=team.id) }}" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-pencil"></i> Düzenle
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#membersModal{{ team.id }}">
+                                        <i class="bi bi-people"></i> Üyeler
+                                    </button>
+                                    <form action="{{ url_for('delete_team', team_id=team.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Bu ekibi silmek istediğinizden emin misiniz?');">
+                                        <button type="submit" class="btn btn-sm btn-danger">
+                                            <i class="bi bi-trash"></i> Sil
+                                        </button>
+                                    </form>
+                                </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Üye Modalları -->
+    {% for team in teams %}
+    <div class="modal fade" id="membersModal{{ team.id }}" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ team.name }} - Ekip Üyeleri</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Ad Soyad</th>
+                                    <th>E-posta</th>
+                                    <th>Diğer Ekipler</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for member in team.members %}
+                                <tr>
+                                    <td>{{ member.first_name }} {{ member.last_name }}</td>
+                                    <td>{{ member.email }}</td>
+                                    <td>
+                                        {% for other_team in member.teams %}
+                                            {% if other_team.id != team.id %}
+                                                <span class="badge bg-info">{{ other_team.name }}</span>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        {% if current_user.is_admin or current_user.has_team_management_permission(team.id) %}
+                                        <form action="{{ url_for('remove_team_member', team_id=team.id, user_id=member.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Bu üyeyi ekipten çıkarmak istediğinizden emin misiniz?');">
+                                            <button type="submit" class="btn btn-sm btn-danger">
+                                                <i class="bi bi-person-x"></i> Çıkar
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %} 

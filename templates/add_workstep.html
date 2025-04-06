@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="mb-0">{{ process.name }} - Yeni İş Adımı Ekle</h2>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">İş Adımı Adı</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Açıklama</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="duration" class="form-label">Süre (Gün)</label>
+                        <input type="number" class="form-control" id="duration" name="duration" required min="1">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Atama Tipi</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="assignment_type" id="team_assignment" value="team" checked>
+                            <label class="form-check-label" for="team_assignment">
+                                Ekibe Ata
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="assignment_type" id="user_assignment" value="user">
+                            <label class="form-check-label" for="user_assignment">
+                                Kullanıcıya Ata
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3" id="team_select">
+                        <label for="team" class="form-label">Atanan Ekip</label>
+                        <select class="form-select" id="team" name="team">
+                            <option value="">Ekip Seçin</option>
+                            <option value="Tasarım">Tasarım</option>
+                            <option value="Üretim">Üretim</option>
+                            <option value="Kalite">Kalite</option>
+                            <option value="Lojistik">Lojistik</option>
+                            <option value="Satış">Satış</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3" id="user_select" style="display: none;">
+                        <label for="user" class="form-label">Atanan Kullanıcı</label>
+                        <select class="form-select" id="user" name="user">
+                            <option value="">Kullanıcı Seçin</option>
+                            {% for user in users %}
+                            <option value="{{ user.id }}">{{ user.username }} ({{ user.team }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">İş Adımı Ekle</button>
+                        <a href="{{ url_for('process_detail', id=process.id) }}" class="btn btn-secondary">İptal</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const teamAssignment = document.getElementById('team_assignment');
+    const userAssignment = document.getElementById('user_assignment');
+    const teamSelect = document.getElementById('team_select');
+    const userSelect = document.getElementById('user_select');
+    
+    function toggleAssignment() {
+        if (teamAssignment.checked) {
+            teamSelect.style.display = 'block';
+            userSelect.style.display = 'none';
+        } else {
+            teamSelect.style.display = 'none';
+            userSelect.style.display = 'block';
+        }
+    }
+    
+    teamAssignment.addEventListener('change', toggleAssignment);
+    userAssignment.addEventListener('change', toggleAssignment);
+});
+</script>
+{% endblock %} 

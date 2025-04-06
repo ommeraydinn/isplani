@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Taslaktan Yeni Süreç Oluştur</h2>
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Seçilen Taslak: {{ template.name }}</h5>
+        </div>
+        <div class="card-body">
+            <p>{{ template.description }}</p>
+            <p><strong>İş Adımları:</strong> {{ template.work_steps|length }} adım</p>
+        </div>
+    </div>
+
+    <form method="POST">
+        <div class="mb-3">
+            <label for="name" class="form-label">Süreç Adı</label>
+            <input type="text" class="form-control" id="name" name="name" required 
+                   value="{{ template.name }}" placeholder="Örn: Mikropaket Süreci - Nisan 2024">
+        </div>
+        <div class="mb-3">
+            <label for="description" class="form-label">Açıklama</label>
+            <textarea class="form-control" id="description" name="description" rows="3">{{ template.description }}</textarea>
+        </div>
+
+        <div class="mb-3">
+            <h4>İş Adımları</h4>
+            {% for step in template.work_steps|sort(attribute='sequence_number') %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">{{ step.name }}</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Süre:</strong> {{ step.duration }} gün</p>
+                            {% if step.is_reference %}
+                            <div class="mb-3">
+                                <label class="form-label">Referans Bitiş Tarihi</label>
+                                <input type="datetime-local" class="form-control" 
+                                       name="work_steps[{{ loop.index0 }}][reference_end_date]" required>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            {% if step.assigned_team %}
+                            <p><strong>Atanan Ekip:</strong> {{ step.assigned_team }}</p>
+                            {% endif %}
+                            {% if step.assigned_user %}
+                            <p><strong>Atanan Kullanıcı:</strong> {{ step.assigned_user.username }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="mb-3">
+            <button type="submit" class="btn btn-primary">Süreç Oluştur</button>
+            <a href="{{ url_for('process_templates') }}" class="btn btn-secondary">İptal</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Referans iş adımı varsa, varsayılan olarak bir hafta sonrasını ayarla
+    const referenceDateInputs = document.querySelectorAll('input[type="datetime-local"]');
+    referenceDateInputs.forEach(input => {
+        if (!input.value) {
+            const nextWeek = new Date();
+            nextWeek.setDate(nextWeek.getDate() + 7);
+            input.value = nextWeek.toISOString().slice(0, 16);
+        }
+    });
+});
+</script>
+{% endblock %} 

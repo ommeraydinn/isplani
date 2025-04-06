@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>{% if team %}Ekip Düzenle{% else %}Yeni Ekip Oluştur{% endif %}</h2>
+                <a href="{{ url_for('teams') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Geri
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Ekip Adı</label>
+                            <input type="text" class="form-control" id="name" name="name" value="{{ team.name if team else '' }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="parent_type" class="form-label">Üst Ekip</label>
+                            <input type="text" class="form-control" id="parent_type" name="parent_type" value="{{ team.parent_type if team else '' }}" placeholder="Örn: Genel Müdürlük, Bölge Müdürlüğü, Şube Müdürlüğü">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Açıklama</label>
+                            <textarea class="form-control" id="description" name="description" rows="3">{{ team.description if team else '' }}</textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="parent_id" class="form-label">Bağlı Olduğu Ekip</label>
+                            <select class="form-select" id="parent_id" name="parent_id">
+                                <option value="">Seçiniz</option>
+                                {% for parent_team in parent_teams %}
+                                <option value="{{ parent_team.id }}" {% if team and team.parent_id == parent_team.id %}selected{% endif %}>
+                                    {{ parent_team.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="leader_id" class="form-label">Ekip Lideri</label>
+                            <select class="form-select" id="leader_id" name="leader_id">
+                                <option value="">Seçiniz</option>
+                                {% for user in users %}
+                                <option value="{{ user.id }}" {% if team and team.leader_id == user.id %}selected{% endif %}>
+                                    {{ user.first_name }} {{ user.last_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        {% if team %}
+                        <div class="mb-3">
+                            <label class="form-label">Ekip Üyeleri</label>
+                            <div class="list-group">
+                                {% for user in users %}
+                                <div class="list-group-item">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="members" value="{{ user.id }}"
+                                            {% if user in team.members %}checked{% endif %} id="member_{{ user.id }}">
+                                        <label class="form-check-label" for="member_{{ user.id }}">
+                                            {{ user.first_name }} {{ user.last_name }}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> {% if team %}Güncelle{% else %}Oluştur{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
