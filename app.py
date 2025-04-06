@@ -136,9 +136,7 @@ class Team(db.Model):
     leader = db.relationship('User', foreign_keys=[leader_id], backref='led_teams')
     members = db.relationship(
         'User',
-        secondary='team_members',
-        primaryjoin="Team.id==team_members.c.team_id",
-        secondaryjoin="User.id==team_members.c.user_id",
+        secondary=team_members,
         backref=db.backref('teams', lazy='dynamic'),
         lazy='dynamic'
     )
@@ -200,8 +198,8 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(128))
     is_active = db.Column(db.Boolean, default=False)
     activation_token = db.Column(db.String(100), unique=True)
-    teams = db.relationship('Team', secondary=team_members, backref='members')
     created_teams = db.relationship('Team', backref='creator', lazy=True)
+    teams = db.relationship('Team', secondary=team_members, backref='members')
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
