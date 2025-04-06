@@ -281,33 +281,42 @@ def login():
 # Kayıt sayfası
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    if current_user.is_authenticated:
-        return redirect(url_for('index'))
     if request.method == 'POST':
-        username = request.form.get('username')
+        first_name = request.form.get('first_name')
+        last_name = request.form.get('last_name')
         email = request.form.get('email')
         password = request.form.get('password')
-        team = request.form.get('team')
         
-        if User.query.filter_by(username=username).first():
-            flash('Bu kullanıcı adı zaten kullanılıyor', 'danger')
-            return redirect(url_for('register'))
-            
-        if User.query.filter_by(email=email).first():
-            flash('Bu e-posta adresi zaten kullanılıyor', 'danger')
+        # Kullanıcı var mı kontrol et
+        user = User.query.filter_by(email=email).first()
+        if user:
+            flash('Bu e-posta adresi zaten kayıtlı!')
             return redirect(url_for('register'))
         
-        new_user = User(
-            username=username,
-            email=email,
-            password=generate_password_hash(password),
-            is_admin=False
-        )
+        # Yeni kullanıcı oluştur
+        new_user = User(first_name=first_name, last_name=last_name, email=email)
+        new_user.set_password(password)
+        new_user.activation_token = secrets.token_urlsafe(32)
         db.session.add(new_user)
         db.session.commit()
         
-        flash('Kayıt başarılı! Şimdi giriş yapabilirsiniz.', 'success')
+        # Aktivasyon maili gönder
+        activation_link = url_for('activate_account', 
+                                token=new_user.activation_token, 
+                                _external=True)
+        
+        print(f"Aktivasyon linki oluşturuldu: {activation_link}")  # Debug log
+        
+        try:
+            send_invitation_email(email, activation_link, first_name, last_name)
+            print(f"Mail gönderme denemesi yapıldı: {email}")  # Debug log
+            flash('Kayıt başarılı! Lütfen e-postanızı kontrol edin.')
+        except Exception as e:
+            print(f"Mail gönderme hatası: {str(e)}")  # Debug log
+            flash('Kayıt başarılı ancak aktivasyon maili gönderilemedi.')
+            
         return redirect(url_for('login'))
+    
     return render_template('register.html')
 
 # Çıkış işlemi
