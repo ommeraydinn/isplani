@@ -194,17 +194,20 @@ class Team(db.Model):
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=True)  # Başlangıçta boş olabilir
+    first_name = db.Column(db.String(80), nullable=False)
+    last_name = db.Column(db.String(80), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(120), nullable=True)
-    first_name = db.Column(db.String(50))
-    last_name = db.Column(db.String(50))
-    is_admin = db.Column(db.Boolean, default=False)
-    is_active = db.Column(db.Boolean, default=False)  # Hesap aktifleştirildi mi?
-    invitation_token = db.Column(db.String(100), unique=True)  # Davet token'ı
-    invitation_sent_at = db.Column(db.DateTime)  # Davetin gönderilme zamanı
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    password_hash = db.Column(db.String(128))
+    is_active = db.Column(db.Boolean, default=False)
+    activation_token = db.Column(db.String(100), unique=True)
+    teams = db.relationship('Team', secondary=team_members, backref='members')
+    created_teams = db.relationship('Team', backref='creator', lazy=True)
+    
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
     # İlişkiler
     work_steps = db.relationship('WorkStep', backref='assigned_user', lazy=True, foreign_keys=[WorkStep.assigned_user_id])
@@ -269,7 +272,7 @@ def login():
             flash('Hesabınız henüz aktifleştirilmemiş. Lütfen e-posta adresinizi kontrol edin.', 'warning')
             return redirect(url_for('login'))
             
-        if user and check_password_hash(user.password, password):
+        if user and user.check_password(password):
             login_user(user)
             flash('Başarıyla giriş yaptınız.', 'success')
             return redirect(url_for('index'))
@@ -1257,7 +1260,7 @@ def activate_account(token):
         
         # Hesabı aktifleştir
         user.username = username
-        user.password = generate_password_hash(password)
+        user.password_hash = generate_password_hash(password)
         user.is_active = True
         user.invitation_token = None  # Token'ı temizle
         
