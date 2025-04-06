@@ -289,6 +289,11 @@ def register():
         last_name = request.form.get('last_name')
         email = request.form.get('email')
         password = request.form.get('password')
+        password_confirm = request.form.get('password_confirm')
+        
+        if password != password_confirm:
+            flash('Şifreler eşleşmiyor!')
+            return redirect(url_for('register'))
         
         # Kullanıcı var mı kontrol et
         user = User.query.filter_by(email=email).first()
