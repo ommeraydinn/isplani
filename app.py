@@ -137,8 +137,11 @@ class Team(db.Model):
     members = db.relationship(
         'User',
         secondary=team_members,
+        primaryjoin="Team.id==team_members.c.team_id",
+        secondaryjoin="User.id==team_members.c.user_id",
         backref=db.backref('teams', lazy='dynamic'),
-        lazy='dynamic'
+        lazy='dynamic',
+        foreign_keys=[team_members.c.team_id, team_members.c.user_id]
     )
 
     def get_all_members(self):
