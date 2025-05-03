@@ -1043,12 +1043,13 @@ def delete_template(template_id):
 @app.route('/teams')
 @login_required
 def teams():
-    """Ekipleri listele"""
-    if current_user.is_admin:
-        teams = Team.query.all()
-    else:
-        teams = current_user.get_all_teams()
-    return render_template('teams.html', teams=teams)
+    # Kullanıcının lideri olduğu ekipleri getir
+    led_teams = Team.query.filter_by(leader_id=current_user.id).all()
+    # Kullanıcının üyesi olduğu ekipleri getir
+    member_teams = current_user.teams
+    # Tüm ekipleri birleştir
+    all_teams = list(set(led_teams + member_teams))
+    return render_template('teams.html', teams=all_teams)
 
 @app.route('/teams/add', methods=['GET', 'POST'])
 @login_required
@@ -1279,6 +1280,36 @@ Bu link 24 saat içinde geçerliliğini yitirecektir.
         import traceback
         print(f"Hata detayı:\n{traceback.format_exc()}")
         return False
+
+@app.route('/teams/create', methods=['GET', 'POST'])
+@login_required
+def create_team():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        
+        if not name:
+            flash('Ekip adı boş olamaz!')
+            return redirect(url_for('create_team'))
+        
+        # Yeni ekip oluştur
+        new_team = Team(
+            name=name,
+            description=description,
+            leader_id=current_user.id
+        )
+        
+        try:
+            db.session.add(new_team)
+            db.session.commit()
+            flash('Ekip başarıyla oluşturuldu!')
+            return redirect(url_for('teams'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ekip oluşturulurken bir hata oluştu: {str(e)}')
+            return redirect(url_for('create_team'))
+    
+    return render_template('create_team.html')
 
 # Veritabanını oluştur
 with app.app_context():
