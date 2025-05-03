@@ -10,6 +10,8 @@ import secrets
 import holidays
 from sqlalchemy.orm import relationship
 from flask_migrate import Migrate
+import logging
+from logging.handlers import RotatingFileHandler
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'gizli-anahtar-buraya')
@@ -201,7 +203,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(128))
     is_active = db.Column(db.Boolean, default=False)
     activation_token = db.Column(db.String(100), unique=True)
-    created_teams = db.relationship('Team', backref='creator', lazy=True)
+    created_teams = db.relationship('Team', backref='creator', lazy=True, overlaps="leader,led_teams")
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -1045,8 +1047,8 @@ def delete_template(template_id):
 def teams():
     # Kullanıcının lideri olduğu ekipleri getir
     led_teams = Team.query.filter_by(leader_id=current_user.id).all()
-    # Kullanıcının üyesi olduğu ekipleri getir
-    member_teams = current_user.teams
+    # Kullanıcının üyesi olduğu ekipleri getir ve listeye dönüştür
+    member_teams = list(current_user.teams.all())
     # Tüm ekipleri birleştir
     all_teams = list(set(led_teams + member_teams))
     return render_template('teams.html', teams=all_teams)
@@ -1310,6 +1312,18 @@ def create_team():
             return redirect(url_for('create_team'))
     
     return render_template('create_team.html')
+
+# Loglama ayarları
+if not os.path.exists('logs'):
+    os.mkdir('logs')
+file_handler = RotatingFileHandler('logs/app.log', maxBytes=10240, backupCount=10)
+file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+))
+file_handler.setLevel(logging.INFO)
+app.logger.addHandler(file_handler)
+app.logger.setLevel(logging.INFO)
+app.logger.info('İş Planı başlatılıyor')
 
 # Veritabanını oluştur
 with app.app_context():
